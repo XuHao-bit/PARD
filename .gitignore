@@ -1,0 +1,4 @@
+log/*
+saved_model/*
+sh_result/*
+__pycache__/*
