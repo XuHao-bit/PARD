@@ -126,24 +126,21 @@ class Trainer(object):
             full_input = copy.deepcopy(self.public_uiemb)
         
         if len(full_input) > 0 and is_full:
-            # public emb 有数据
+            # pub data
             full_input = torch.cat(full_input, dim=0)
-            full_input = torch.cat([full_input, esti_input.cpu()], dim=0)
             idx = np.random.choice(full_input.shape[0], int(full_input.shape[0] * self.config['pubdata_ratio']), replace=False)
-            
-            if idx.shape[0] > 0:
-                full_input = full_input[idx]
-            else:
-                full_input = full_input
-            
+            full_input = full_input[idx] if idx.shape[0] > 0 else full_input
             full_label = copy.deepcopy(self.public_y[attr])
             full_label = torch.cat(full_label, dim=0)
-            full_label = torch.cat([full_label, labels], dim=0)
-            if idx.shape[0] > 0:
-                full_label = full_label[idx]
-            else:
-                full_label = full_label
+            full_label = full_label[idx] if idx.shape[0] > 0 else full_label
 
+            local_data = esti_input.cpu()
+            idx_local = np.random.choice(local_data.shape[0], int(local_data.shape[0] * self.config['localdata_ratio']), replace=False)
+            local_data = local_data[idx_local] if idx_local.shape[0] > 0 else local_data
+            local_label = labels[idx_local] if idx_local.shape[0] > 0 else labels
+
+            full_input = torch.cat([full_input, local_data], dim=0)            
+            full_label = torch.cat([full_label, local_label], dim=0)
         else:
             # no data in public emb or just use esti_input
             full_input = torch.cat([esti_input.cpu()], dim=0)
@@ -161,6 +158,7 @@ class Trainer(object):
                 label = privacy_labels[attr]
                 labels = self.label2torch(attr, esti_input, label)
                 
+                # esti_input, labels = self.get_full_input_label(esti_input, labels, attr, is_pu, is_full)
                 esti_input, labels = self.get_full_input_label2(esti_input, labels, attr, is_pu, is_full)
                 estimator, criterion = self.get_estimator_criterion(model_client, attr, is_pu)
                 output = estimator(esti_input)

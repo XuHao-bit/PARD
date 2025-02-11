@@ -35,7 +35,7 @@ def get_config():
     parser.add_argument('--l2_regularization', type=float, default=0.)
     parser.add_argument('--use_cuda', type=boolean_string, default=True)
     parser.add_argument('--device_id', type=str, default='0')
-    parser.add_argument('--device', type=str, default='cpu')
+    # parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--NUM_NEG', type=int, default=999) # number of negative samples for val&tst
     parser.add_argument('--earlystop', type=int, default=20) # number of negative samples for val&tst
@@ -69,7 +69,8 @@ def get_config():
     parser.add_argument('--GNN', type=boolean_string, default=False, help='use LightGCN(True), NCF(False)')
     parser.add_argument('--gnn_drop', type=float, default=0.5)
     parser.add_argument('--is_esti_local', type=boolean_string, default=True, help='train estimator on trust party (False) or locally (True)')
-    parser.add_argument('--pubdata_ratio', type=float, default=0.1, help='train estimator on trust party (False) or locally (True)')
+    parser.add_argument('--pubdata_ratio', type=float, default=0.2, help='estimator train data ratio of trust party')
+    parser.add_argument('--localdata_ratio', type=float, default=0.6, help='estimator train data ratio of local data')
 
 
     args = parser.parse_args()

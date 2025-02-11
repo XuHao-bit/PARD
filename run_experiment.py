@@ -1,7 +1,7 @@
 import os
 os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"
-from apdf import FedTrainer
+from trainer import *
 # from fedncf import *
 from utils import *
 from config import *

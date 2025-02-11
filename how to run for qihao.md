@@ -59,3 +59,8 @@ cd /home/zhaoxuhao/FedRec/FedNCF
 # 根据eval_privacy.py里面的todos修改文件名
 python eval_privacy.py --dataset ml-1m --attack_mode u_emb+i_emb >> log/ppattack_finalres/ml1m-xxx.txt # xxx是模型名
 ```
+
+### hyper param
+- ml-100k
+    - pretrain lr_eta 80, lr_client 0.5
+    - finetune lr_eta 1, lr_client 0.5
