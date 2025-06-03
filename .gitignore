@@ -2,3 +2,7 @@ log/*
 saved_model/*
 sh_result/*
 __pycache__/*
+/home/zhaoxuhao/FedRec/apdf/how to run for qihao.md
+/home/zhaoxuhao/FedRec/apdf/config-ml.py
+/home/zhaoxuhao/FedRec/apdf/heatmap.py
+/home/zhaoxuhao/FedRec/apdf/trainer_ml100k.py
