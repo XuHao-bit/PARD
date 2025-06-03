@@ -47,10 +47,11 @@ class SampleGenerator(object):
         self.user_pool = set(self.ratings['userId'].unique())
         self.item_pool = set(self.ratings['itemId'].unique())
         # create negative item samples for NCF learning
-        # 99 negatives for each user's test item
-        self.negatives = self._sample_negative(self.ratings)
         # divide all ratings into train and test two dataframes, which consit of userId, itemId and rating three columns.
         self.train_ratings, self.val_ratings, self.test_ratings = self._split_loo(self.preprocess_ratings)
+        
+        # 99 negatives for each user's test item
+        self.negatives = self._sample_negative(self.train_ratings)
     
     def get_data(self):
         if not os.path.exists(self.dataset_dir + "train.npy"):# explicit feedback using _normalize and implicit using _binarize

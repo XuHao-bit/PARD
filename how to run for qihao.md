@@ -1,6 +1,3 @@
-1 先自己跑跑看看代码是啥样子，模型结构是啥样子；
-2 看看论文里面，比如ml-100k的结果 '~/log/final_res'，先看看这个log文件在哪里，然后看看log文件里面的超参数是啥，自己改成这个超参数，看看能不能跑出结果出来；
-    - 自己的log在：~/log/ 下面；
 
 ### 实验结果：
 https://eve0wcbe0c.feishu.cn/sheets/LYZZsuDXqhewzAtYQ6KcbOI5n9d

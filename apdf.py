@@ -224,3 +224,115 @@ class Client(torch.nn.Module):
 
     def load_pretrain_weights(self):
         pass
+
+
+class General_Client(torch.nn.Module):
+    def __init__(self, config):
+        super(General_Client, self).__init__()
+        self.config = config
+        self.dataset = config['dataset']
+        self.num_items = config['num_items']
+        self.latent_dim = config['latent_dim']
+        self.device = config['device']
+
+        self.embedding_user = torch.nn.Embedding(num_embeddings=1, embedding_dim=self.latent_dim)
+        self.embedding_item = torch.nn.Embedding(num_embeddings=self.num_items, embedding_dim=self.latent_dim)
+
+        # Score function
+        self.fc_layers = torch.nn.ModuleList()
+        for idx, (in_size, out_size) in enumerate(zip(config['client_model_layers'][:-1], config['client_model_layers'][1:])):
+            self.fc_layers.append(torch.nn.Linear(in_size, out_size))
+        
+        self.affine_output = torch.nn.Linear(in_features=config['client_model_layers'][-1], out_features=1)
+        self.logistic = torch.nn.Sigmoid()
+
+        if config['dataset'] == 'ml-100k' or config['dataset'] == 'ml-1m' or config['dataset'] == 'ali-ads':
+        # g_{phi}: emb -> privacy attributes
+            esti_dim = self.latent_dim * 2
+            # euser+item estimator
+            # self.general = General_Module(esti_dim)
+            self.age_estimator = Discriminator(config, esti_dim, attr='age')
+            self.gen_estimator = Discriminator(config, esti_dim, attr='gender')
+            self.occ_estimator = Discriminator(config, esti_dim, attr='occupation')
+
+    def inference(self, pos_items, drop_prob=0.5):
+        # # N_u = len(pos_items); N_i = 1;
+        drop_mask = torch.rand(pos_items.size()) > drop_prob
+        if sum(drop_mask) > 0:
+            # avoid nan
+            dropped_pos_items = pos_items[drop_mask]
+        else:
+            dropped_pos_items = pos_items
+        user_emb = self.embedding_user.weight
+        item_emb = self.embedding_item.weight
+        pos_item_emb = item_emb[dropped_pos_items]
+        
+        # new user emb
+        new_user_emb = torch.mean(pos_item_emb, dim=0, keepdim=True) 
+        new_user_emb = (new_user_emb + user_emb) / 2
+
+        return new_user_emb, item_emb
+        
+
+    def forward(self, item_indices, pos_items=None):
+        if self.config['GNN']:
+            user_emb, item_emb = self.inference(pos_items, self.config['gnn_drop'])
+            user_embedding = user_emb[torch.tensor([0] * len(item_indices)).to(self.device)]
+            item_embedding = item_emb[item_indices]
+        else:
+            user_embedding = self.embedding_user(torch.tensor([0] * len(item_indices)).to(self.device))
+            item_embedding = self.embedding_item(item_indices)
+        
+        vector = torch.cat([user_embedding, item_embedding], dim=-1)
+        for idx, _ in enumerate(range(len(self.fc_layers))):
+            vector = self.fc_layers[idx](vector)
+            vector = torch.nn.ReLU()(vector)
+        logits = self.affine_output(vector)
+        rating = self.logistic(logits)
+        return rating
+    
+
+    def get_item_emb(self, items, pos_masks):
+        with torch.no_grad():
+            emb_list = []
+            if sum(pos_masks) > 0:
+                item_embeddings = self.embedding_item(items)[pos_masks]
+                item_embedding = torch.mean(item_embeddings, dim=0, keepdim=True)
+                emb_list.append(item_embedding)
+            return emb_list
+    
+    def get_input(self, items, pos_masks):
+        with torch.no_grad():
+            emb_list = []
+            if sum(pos_masks) > 0:
+                item_embeddings = self.embedding_item(items)[pos_masks]
+                item_embedding = torch.mean(item_embeddings, dim=0, keepdim=True)
+                emb_list.append(item_embedding)
+            user_embedding = self.embedding_user(torch.tensor([0] * len(items)).to(self.device))
+            emb_list += [user_embedding]
+            return torch.cat(emb_list, dim=0)
+    
+    # def get_ei_input(self, items, pos_masks):
+    #     with torch.no_grad():
+    #         item_embeddings = torch.mean(self.embedding_item(items)[pos_masks], dim=0, keepdim=True)
+    #         euser_embedding = self.embedding_euser(torch.tensor([0] * item_embeddings.shape[0]).to(self.device))
+    #         # print(item_embeddings, euser_embedding)
+    #         emb_list = [euser_embedding, item_embeddings]
+    #         return torch.cat(emb_list, dim=1)
+
+    # def get_pu_input(self, items):
+    #     with torch.no_grad():
+    #         puser_embedding = self.embedding_puser(torch.tensor([0]).to(self.device))
+    #         emb_list = [puser_embedding]
+    #         return torch.cat(emb_list, dim=0)
+
+    def get_train_input(self, items, pos_masks):
+        user_embedding = self.embedding_user(torch.tensor([0] * len(items)).to(self.device))
+        emb_list = [user_embedding]
+        return torch.cat(emb_list, dim=0)
+
+    def init_weight(self):
+        pass
+
+    def load_pretrain_weights(self):
+        pass

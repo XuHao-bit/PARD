@@ -64,6 +64,7 @@ def get_config():
     parser.add_argument('--pri_ratio', type=str, default='1,1,1', help='importance of age, gender, occupation')
     parser.add_argument('--user_only', type=boolean_string, default=False, help='only protect privacy of exclusive user, this will impact the estimator input')
     parser.add_argument('--ITEM_NAME', type=str, default='updated_item', help='positive item emb updated to server')
+    parser.add_argument('--EUSER_NAME', type=str, default='test_euser_emb', help='client euser embed')
     parser.add_argument('--ESTI_NAME', type=str, default='esti_', help='positive item emb updated to server')
     parser.add_argument('--PRI_TEST_RATIO', type=float, default=0.8, help='ratio of test users in privacy test') # 
     parser.add_argument('--GNN', type=boolean_string, default=False, help='use LightGCN(True), NCF(False)')
@@ -71,6 +72,7 @@ def get_config():
     parser.add_argument('--is_esti_local', type=boolean_string, default=True, help='train estimator on trust party (False) or locally (True)')
     parser.add_argument('--pubdata_ratio', type=float, default=0.2, help='estimator train data ratio of trust party')
     parser.add_argument('--localdata_ratio', type=float, default=0.6, help='estimator train data ratio of local data')
+    parser.add_argument('--pri_esti_round', type=int, default=1, help='train estimator every x round')
 
 
     args = parser.parse_args()
@@ -136,9 +138,9 @@ def get_config():
         config['num_occupation'] = 2
         config['NUM_NEG'] = 999
         # config['NAME'] = 'apdf-pre2-titan.pkl' # ml
-        config['NAME'] = 'APDF-pretrain-ali.pkl' # ali
+        # config['NAME'] = 'APDF-pretrain-ali.pkl' # ali
         config['gnn_drop'] = 0.1
-        config['pri_esti_round'] = 2 # 每隔多少epoch训练一次estimator
+        # config['pri_esti_round'] = 2 # 每隔多少epoch训练一次estimator
     else:
         pass
 

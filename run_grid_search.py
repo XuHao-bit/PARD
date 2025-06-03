@@ -11,16 +11,13 @@ from trainer import *
 config = get_config()
 
 # ml-1m: fedncf:0.5; fedgnn:0.1;
-lr_clients = [0.1] # lr 5, 10 就不行了 [1, 0.5, 0.05]
+lr_clients = [0.1] if config['GNN'] else [0.1] # lr 5, 10 就不行了 [1, 0.5, 0.05]
 
 local_epochs = [1] # [1, 2]
-pri_epochs = [1, 3]
-pri_lrs = [0.01, 0.05, 0.1] # ali-ads&ml1m=0.01; ml100k=0.1;
 
-if config['dataset'] == 'ml-100k':
-    lr_etas = [1.]
-else:
-    lr_etas = [80.]
+pri_epochs = [1, 3] if config['dataset'] == 'ml-1m' else [3]
+pri_lrs = [0.1] if config['dataset'] == 'ml-100k' else [0.01] # ali-ads&ml1m=0.01; ml100k=0.1;
+lr_etas = [1.] if config['dataset'] == 'ml-100k' else [80.]
 
 latent_dims = [64]
 neg_samples = [5]
@@ -28,12 +25,12 @@ neg_samples = [5]
 localdata_ratio = [0.6] # local data ratio
 pubdata_ratio = [0.08]
 
-lam_eus = [0.1] # disentangle eu
-# lam_eus = [0.03, 0.05, 0.07] # disentangle eu
+# lam_eus = [0.1] # disentangle eu
+lam_eus = [0.5] # disentangle eu
 # lam_eus = [0.5] # disentangle [0.1, 0.5, 0.7, 0.9]
-lam_pus = [0.5] # disentangle pu
-# lam_pus = [0.5]  # disentangle pu [0.1, 0.3, 0.5] 
-clients_sample_ratios = [0.8]
+# lam_pus = [0.5] # disentangle pu
+lam_pus = [0, 0.1, 0.3, 0.5, 0.7, 0.9]  # disentangle pu [0.1, 0.3, 0.5] 
+clients_sample_ratios = [0.8] if config['dataset'] == 'ml-1m' else [1.]
 
 hypr_param = [lr_clients, local_epochs, lr_etas, latent_dims, neg_samples, lam_eus, lam_pus, pri_lrs, pri_epochs, clients_sample_ratios, localdata_ratio, pubdata_ratio]
 hypr_name = ['lr_client', 'local_epoch', 'lr_eta', 'latent_dim', 'num_negative', 'lam_eu', 'lam_pu', 'pries_lr', 'pries_epoch', 'clients_sample_ratio', 'localdata_ratio', 'pubdata_ratio']

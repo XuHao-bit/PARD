@@ -41,8 +41,11 @@ def random_attack(config, attr):
     train_labels = labels[user_train]
     max_label = int(max(labels))
     train_label_distribution = np.bincount(train_labels, minlength=max_label) / len(train_labels)
-    # print(len(list(range(max(labels)))), train_label_distribution.size)
-    test_predictions = np.random.choice(list(range(max_label)), size=len(user_test), p=train_label_distribution)
+    # print(train_label_distribution)
+    # print(labels)
+    # print(list(range(max_label + 1)))
+    # print(len(list(range(max_label))), train_label_distribution.size)
+    test_predictions = np.random.choice(list(range(max_label + 1)), size=len(user_test), p=train_label_distribution)
 
     if attr == 'gender':
         auc_score = roc_auc_score(labels[user_test], test_predictions)
@@ -457,21 +460,24 @@ if __name__ == '__main__':
     config = get_config()
     print(config)
     seed_all(config['seed'])
-    use_cuda(True, config['device_id'])
-    # NAME = 'FedNCF'
-    is_ldp = False
-    NAME = 'pretrain-apdf'
+    random_attack(config, 'age')
+    random_attack(config, 'gender')
+    random_attack(config, 'occupation')
+    # use_cuda(True, config['device_id'])
+    # # NAME = 'FedNCF'
+    # is_ldp = False
+    # NAME = 'pretrain-apdf'
 
-    # user_attr = pd.read_csv(f'../data/{config["dataset"]}/users.dat')
-    path = f'./saved_model/{config["dataset"]}/{NAME}.pkl'
-    all_param = torch.load(path)
-    rating = load_data(config)
-    sample_generator = SampleGenerator(config=config, ratings=rating)
-    # all_train_data = sample_generator.store_all_train_data(config['num_negative'])
-    client_model = Client(config)
-    pptrainer = FedTrainer(config)
+    # # user_attr = pd.read_csv(f'../data/{config["dataset"]}/users.dat')
+    # path = f'./saved_model/{config["dataset"]}/{NAME}.pkl'
+    # all_param = torch.load(path)
+    # rating = load_data(config)
+    # sample_generator = SampleGenerator(config=config, ratings=rating)
+    # # all_train_data = sample_generator.store_all_train_data(config['num_negative'])
+    # client_model = Client(config)
+    # pptrainer = FedTrainer(config)
 
-    eval_all_privacy(config, all_param, None, pptrainer.client_keys, pptrainer.server_keys)
+    # eval_all_privacy(config, all_param, None, pptrainer.client_keys, pptrainer.server_keys)
 
 
     # server_param = all_param['server']

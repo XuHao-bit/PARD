@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from eval_privacy import eval_all_privacy
 from sklearn.model_selection import train_test_split
 from apdf import Client
+import time
 
 
 class Trainer(object):
@@ -412,10 +413,11 @@ class Trainer(object):
             self.client_model_params[user] = {}
             for key in self.client_keys:
                 self.client_model_params[user][key] = copy.deepcopy(client_param[key].data).cpu()
-            
+
+            self.client_model_params[user][self.config['EUSER_NAME']] = copy.deepcopy(client_param['embedding_euser.weight'].data).cpu()
             avg_item_emb = torch.mean(client_param['embedding_item.weight'].data[items][pos_mask], dim=0)
             self.client_model_params[user][self.config['ITEM_NAME']] = copy.deepcopy(avg_item_emb).cpu()
-            client_param[self.config['ITEM_NAME']] = copy.deepcopy(avg_item_emb).cpu()
+            client_param[self.config['ITEM_NAME']] = copy.deepcopy(avg_item_emb).cpu()  # privacy-insensitive user will upload this params
 
             # parameters client -> server
             # store client models' local parameters for global update.
@@ -532,6 +534,7 @@ class Trainer(object):
             for key in self.client_keys:
                 self.client_model_params[user][key] = copy.deepcopy(client_param[key].data).cpu()
             
+            self.client_model_params[user][self.config['EUSER_NAME']] = copy.deepcopy(client_param['embedding_euser.weight'].data).cpu()
             avg_item_emb = torch.mean(client_param['embedding_item.weight'].data[items][pos_mask], dim=0)
             self.client_model_params[user][self.config['ITEM_NAME']] = copy.deepcopy(avg_item_emb).cpu()
             client_param[self.config['ITEM_NAME']] = copy.deepcopy(avg_item_emb).cpu()
@@ -567,22 +570,24 @@ class Trainer(object):
     def load_local_param(self, user):
         user_param_dict = copy.deepcopy(self.client_model.state_dict())
         if not self.config['finetune']:
+            # load global param from server
+            for key in self.server_keys:
+                user_param_dict[key] = copy.deepcopy(self.server_model_param[key].data).to(self.device)
             # load client local param
             if user in self.client_model_params.keys():
                 for key in self.client_keys:
                     user_param_dict[key] = copy.deepcopy(self.client_model_params[user][key].data).to(self.device)
-            # load global param from server
-            for key in self.server_keys:
-                user_param_dict[key] = copy.deepcopy(self.server_model_param[key].data).to(self.device)
+
         else:
-            if user in self.client_model_params.keys():
-                for key in self.client_keys:
-                    if key in self.client_model_params[user].keys() and self.client_model_params[user][key].shape == user_param_dict[key].shape:
-                        user_param_dict[key] = copy.deepcopy(self.client_model_params[user][key].data).to(self.device)
             # if self.config['NAME'] == 'pretrain-apdf2':
             for key in self.server_keys:
                 if key in self.server_model_param.keys():
                     user_param_dict[key] = copy.deepcopy(self.server_model_param[key].data).to(self.device)
+            if user in self.client_model_params.keys():
+                for key in self.client_keys:
+                    if key in self.client_model_params[user].keys() and self.client_model_params[user][key].shape == user_param_dict[key].shape:
+                        user_param_dict[key] = copy.deepcopy(self.client_model_params[user][key].data).to(self.device)
+
         return user_param_dict
 
     def load_estimators(self, client_model):
@@ -682,6 +687,7 @@ class Trainer(object):
             logging.info('Round {} starts !'.format(round))
 
             logging.info('-' * 80)
+            st_time = time.time()
             logging.info('Training phase!') # 每一个epoch都要重新sample
             if self.config['pretrain']:
                 if round <= 3:
@@ -695,15 +701,21 @@ class Trainer(object):
 
             all_train_data = sample_generator.store_all_train_data(config['num_negative'])
             if self.config['is_esti_local']:
-                train_loss = self.fed_train_a_round(all_train_data, round)
-            else:
-                train_loss = self.fed_train_a_round_glob_esti(all_train_data, round)
+                train_loss = self.fed_train_a_round(all_train_data, round) # train estimator locally. this function will be slow
+            # else:
+            #     train_loss = self.fed_train_a_round_glob_esti(all_train_data, round) # train estimator globally
             
+            ed_time = time.time()
+            logging.info('Trn_time={:.4f} s'.format(ed_time - st_time))
             logging.info('Trn_Loss={:.5f}'.format(train_loss))
 
             logging.info('-' * 80)
             logging.info('Testing phase!')
+            st_time = time.time()
             test_recall, test_ndcg, test_loss = self.fed_evaluate(test_data)
+            ed_time = time.time()
+            logging.info('Tst_time={:.4f} s'.format(ed_time - st_time))
+
             logging.info(result2str('Recall', config['recall_k'], test_recall))
             logging.info(result2str('NDCG', config['recall_k'], test_ndcg))
             logging.info('Tst_Loss={:.5f}'.format(test_loss))
@@ -728,14 +740,15 @@ class Trainer(object):
                 best_ndcg = vali_ndcg
                 final_test_round = round
                 cnt = 0
-                if self.config['save_model']:
-                    torch.save(now_param, f'./saved_model/{self.config["dataset"]}/{self.config["save_name"]}+lr{self.config["lr_client"]}+eta{self.config["lr_eta"]}')
                 
             else:
                 cnt += 1
                 logging.info(f'Early stop at: {cnt} out of {config["earlystop"]}')
                 if cnt >= config['earlystop']:
                     break
+
+            if self.config['save_model']:
+                    torch.save(now_param, f'./saved_model/{self.config["dataset"]}/{self.config["save_name"]}+lr{self.config["lr_client"]}+eta{self.config["lr_eta"]}')
 
         return test_recalls, test_ndcgs, final_test_round
 
@@ -762,15 +775,46 @@ class FedTrainer(Trainer):
             # self.pestimator_keys_client = ['{}.{}'.format(name, k) for name, estimator in zip(estimators_names, estimators) for k in estimator.state_dict().keys() if k.split('.')[1] == '3']
             self.priemb_keys = ['embedding_age.weight', 'embedding_gen.weight', 'embedding_occ.weight']
             
-        self.server_keys = ['embedding_item.weight', 'embedding_euser.weight'] # param saved in server
+        # self.server_keys = ['embedding_item.weight', 'embedding_euser.weight'] # param saved in server
+        # self.client_keys = ['embedding_puser.weight'] + self.mlp_keys + self.pestimator_keys + self.priemb_keys # param saved in client
+
         # self.client_keys = ['embedding_puser.weight'] + self.mlp_keys  # param saved in client
-        self.client_keys = ['embedding_puser.weight'] + self.mlp_keys + self.pestimator_keys + self.priemb_keys # param saved in client
+        # # both puser&euser are kept in client is better
+        
+        self.server_keys = ['embedding_item.weight'] # param saved in server
+        self.client_keys = ['embedding_puser.weight', 'embedding_euser.weight'] + self.mlp_keys + self.pestimator_keys + self.priemb_keys 
         
         logging.info('server param: {}'.format(self.server_keys))
         logging.info('client param: {}'.format(self.client_keys))
         logging.info('client model: {}'.format(self.client_model))
         # exit(0)
         super(FedTrainer, self).__init__(config)
+
+
+# baseline: UC-FedRec
+class UC_FedTrainer(Trainer):
+    """Engine for training & evaluating GMF model"""
+    def __init__(self, config):
+        # client 自己根据config来判断是lightgcn还是ncf
+        self.client_model = Client(config)
+
+        self.device = config['device']
+        self.dataset = config['dataset']
+        self.client_model.to(self.device)
+        self.mlp_keys = [k for k in self.client_model.state_dict().keys() if k.split('.')[0] in ['fc_layers', 'affine_output']]
+        if self.dataset == 'ml-100k' or self.dataset == 'ali-ads' or self.dataset == 'ml-1m':
+            estimators = [self.client_model.age_estimator, self.client_model.gen_estimator, self.client_model.occ_estimator]
+            estimators_names = ['age_estimator', 'gen_estimator', 'occ_estimator']
+            self.pestimator_keys = ['{}.{}'.format(name, k) for name, estimator in zip(estimators_names, estimators) for k in estimator.state_dict().keys()]
+
+        self.server_keys = ['embedding_item.weight', 'embedding_user.weight'] # param saved in server
+        self.client_keys = ['embedding_user.weight'] + self.mlp_keys + self.pestimator_keys # param saved in client
+        
+        logging.info('server param: {}'.format(self.server_keys))
+        logging.info('client param: {}'.format(self.client_keys))
+        logging.info('client model: {}'.format(self.client_model))
+        # exit(0)
+        super(UC_FedTrainer, self).__init__(config)
 
 
                 
