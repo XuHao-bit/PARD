@@ -51,7 +51,8 @@ class SampleGenerator(object):
         self.train_ratings, self.val_ratings, self.test_ratings = self._split_loo(self.preprocess_ratings)
         
         # 99 negatives for each user's test item
-        self.negatives = self._sample_negative(self.train_ratings)
+        # self.negatives = self._sample_negative(self.train_ratings)
+        self.negatives = self._sample_negative(self.ratings)
     
     def get_data(self):
         if not os.path.exists(self.dataset_dir + "train.npy"):# explicit feedback using _normalize and implicit using _binarize
@@ -105,11 +106,16 @@ class SampleGenerator(object):
 
     def _sample_negative(self, ratings):
         """return all negative items & 198 sampled negative items (99 for val, 99 for tst)"""
+        # 测试集的负样本
         interact_status = ratings.groupby('userId')['itemId'].apply(set).reset_index().rename(
             columns={'itemId': 'interacted_items'})
         interact_status['negative_items'] = interact_status['interacted_items'].apply(lambda x: self.item_pool - x)
         interact_status['val_negative_samples'] = interact_status['negative_items'].apply(lambda x: random.sample(x, self.NUM_NEG))
         interact_status['tst_negative_samples'] = interact_status['negative_items'].apply(lambda x: random.sample(x, self.NUM_NEG))
+
+        # 训练时的负样本按照training set来采
+        train_interact_status = self.train_ratings.groupby('userId')['itemId'].apply(set).reset_index().rename(columns={'itemId': 'interacted_items'})
+        interact_status['negative_items'] = train_interact_status['interacted_items'].apply(lambda x: self.item_pool - x)
         return interact_status[['userId', 'negative_items', 'val_negative_samples', 'tst_negative_samples']]
 
 
